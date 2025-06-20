@@ -1,0 +1,38 @@
+# Python virtual environment
+venv/
+env/
+.venv/
+.env/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment variables
+.env
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Project specific
+*.log
+temp/
+.temp/
+
+# LangChain/FAISS generated files
+.faiss/
+*.faiss
+
+# OpenAI API keys (safety)
+openai_key.txt
+api_keys.txt

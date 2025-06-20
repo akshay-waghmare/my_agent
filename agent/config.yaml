@@ -1,0 +1,24 @@
+# Agent configuration
+
+# LLM settings
+llm:
+  model: "gpt-4"
+  temperature: 0.2
+  max_tokens: 2000
+
+# RAG settings
+rag:
+  chunk_size: 1000
+  chunk_overlap: 100
+  embeddings_model: "text-embedding-ada-002"
+  similarity_top_k: 3
+
+# Agent settings
+agent:
+  max_iterations: 5
+  verbose: true
+
+# Extensions (set to true to enable)
+extensions:
+  git_integration: false  # Set to true to enable git functionality
+  file_writing: true      # Core file operations (always enabled)

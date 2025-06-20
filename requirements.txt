@@ -1,0 +1,9 @@
+openai
+langchain
+langchain-community
+langchain-openai
+autogen-py
+tiktoken
+faiss-cpu
+python-dotenv
+pyyaml
