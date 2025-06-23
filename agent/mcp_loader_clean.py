@@ -1,13 +1,18 @@
 """
-MCP (Model Context Protocol) Style Loader for AutoGen Coding Agent
+MCP Loader - Clean Implementation
 
-This module implements an MCP-like approach for loading tasks and tools,
-then dynamically feeding them into execution without complex agent loops.
+The MCP (Model Context Protocol) loader is responsible for:
+1. Loading the .mcp.yaml configuration file
+2. Setting up the appropriate agents based on the configuration
+3. Executing the workflow based on the MCP settings
+4. Managing tools and capabilities for the agents
 """
 
+import yaml
 import os
 from pathlib import Path
-from typing import Dict, List, Any, Callable
+import json
+from typing import Dict, List, Any, Optional, Union, Callable
 
 class MCPLoader:
     """

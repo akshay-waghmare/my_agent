@@ -33,6 +33,9 @@ temp/
 .faiss/
 *.faiss
 
+# Cache files
+.cache/
+
 # OpenAI API keys (safety)
 openai_key.txt
-api_keys.txt
+api_keys.txt.cache/
