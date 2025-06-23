@@ -1,21 +1,86 @@
 # Agent configuration
 
-# LLM settings
-llm:
-  model: "gpt-4"
+llm:  # Provider can be: openai, groq, anthropic, azure, huggingface, vllm, lmstudio
+  provider: "groq"  # Set your default provider here
+  model: "llama3-70b-8192"      # Default model to use with selected provider
+  
+  # Common parameters
   temperature: 0.2
   max_tokens: 2000
+  
+  # Model configuration (provider-specific)
+  openai:
+    model: "gpt-4"
+    api_key_env: "OPENAI_API_KEY"
+  
+  groq:
+    model: "llama3-70b-8192"  # Groq's capable model for function calling
+    # Other good options: "mixtral-8x7b-32768", "llama-3.1-70b-versatile", "llama-3.1-8b-versatile"
+    api_key_env: "GROQ_API_KEY"
+    api_base: "https://api.groq.com/openai/v1"
+    
+  anthropic:
+    model: "claude-3-sonnet-20240229"  # or "claude-3-opus-20240229"
+    api_key_env: "ANTHROPIC_API_KEY"
+  
+  azure:
+    model: "gpt-4"  # The deployment name on your Azure instance
+    api_key_env: "AZURE_OPENAI_API_KEY"
+    api_base: "https://your-resource-name.openai.azure.com"
+    api_version: "2023-05-15"
+  
+  huggingface:
+    model: "meta-llama/Llama-2-70b-chat-hf"
+    api_key_env: "HUGGINGFACE_API_TOKEN"
+  
+  vllm:
+    model_path: "/path/to/local/model"  # Path to local model files
+    
+  lmstudio:
+    # You can specify a particular model name that's loaded in LM Studio
+    # or leave as "default" to use whatever model is currently loaded
+    model: "default"
+    
+    # Example model names you might use with LM Studio:
+    # model: "deepseek-coder-1.3b-kexer"
+    # model: "codellama-7b-instruct"
+    # model: "phi-2"
+    # model: "mistral-7b-instruct-v0.2"
+    
+    api_base: "http://localhost:1234/v1"
+    api_key_env: "LMSTUDIO_API_KEY"  # Can be any string - LM Studio doesn't need a real API key
+    
+    # Prompt optimization settings for local models
+    system_prompt_template: "You are an AI assistant that specializes in writing clear, concise code. Keep explanations brief and focus on working implementations. When asked to create files, format your response with ```filepath:path/to/file\nfile content here``` format."
+    response_format: "text"  # Options: "text" or "json_object" (if using a model with JSON mode)
+  
+  # Common parameters
+  temperature: 0.2
+  max_tokens: 2000
+
 
 # RAG settings
 rag:
   chunk_size: 1000
   chunk_overlap: 100
-  embeddings_model: "text-embedding-ada-002"
+  
+  # Embeddings configuration
+  embeddings_provider: "local"  # Options: "openai", "local", "code"
+  
+  # OpenAI embeddings settings
+  embeddings_model: "text-embedding-ada-002"  # For OpenAI
+  
+  # Local embeddings settings
+  local_embeddings_model: "all-MiniLM-L6-v2"  # Options: "all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-MiniLM-L12-v2"
+  
+  # Code-specific embeddings (uses specialized models for code understanding)
+  # Set embeddings_provider to "code" to use these
+  
   similarity_top_k: 3
 
 # Agent settings
 agent:
-  max_iterations: 5
+  max_iterations: 6
   verbose: true
 
 # Extensions (set to true to enable)

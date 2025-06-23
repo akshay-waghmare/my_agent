@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import re
 
-def read_file(file_path):
+def read_file(file_path: str) -> str:
     """
     Read content from a file
     
@@ -30,7 +30,7 @@ def read_file(file_path):
     except Exception as e:
         return f"Error reading {file_path}: {e}"
 
-def write_file(file_path, content):
+def write_file(file_path: str, content: str) -> str:
     """
     Write content to a file
     
@@ -51,7 +51,7 @@ def write_file(file_path, content):
     except Exception as e:
         return f"Error writing to {file_path}: {e}"
 
-def create_file(file_path, content):
+def create_file(file_path: str, content: str) -> str:
     """
     Create a new file with the specified content
     
@@ -76,7 +76,7 @@ def create_file(file_path, content):
     except Exception as e:
         return f"Error creating {file_path}: {e}"
 
-def apply_code_diff(file_path, diff_content):
+def apply_code_diff(file_path: str, diff_content: str) -> bool:
     """
     Apply a code diff to a file
     
@@ -141,7 +141,7 @@ def apply_code_diff(file_path, diff_content):
         print(f"Error applying diff to {file_path}: {e}")
         return False
 
-def load_tasks(tasks_file="tasks.md"):
+def load_tasks(tasks_file: str = "tasks.md") -> str:
     """
     Load tasks from tasks.md file
     

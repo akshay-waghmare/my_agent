@@ -1,0 +1,35 @@
+# Model Context Protocol (MCP) Configuration for Bubble Shooter Game
+
+version: "1.0"
+
+# Agents to use for this project
+agents:
+  - planner    # Breaks down tasks into subtasks
+  - coder      # Writes actual code
+  - reviewer   # Reviews the code
+  - test       # Writes and executes tests
+  - documentation  # Generates README, comments, docstrings
+
+# Project goals
+goals:
+  - "Create a fully functional bubble shooter game"
+  - "Ensure responsive design that works on desktop and mobile"
+  - "Implement clean and maintainable code structure"
+  - "Create engaging gameplay mechanics"
+
+# Project constraints
+constraints:
+  - "Do not modify any file outside the bubble-shooter-game directory"
+  - "Focus on browser compatibility (Chrome, Firefox, Safari, Edge)"
+  - "Maintain a responsive layout for different screen sizes"
+
+# Workflow type: sequential or collaborative
+workflow: "collaborative"
+
+# Project metadata
+metadata:
+  name: "Bubble Shooter Game"
+  description: "A fun bubble shooter game built with HTML5, CSS, and JavaScript"
+  type: "game"
+  project_dir: "bubble-shooter-game"
+  tasks_file: "agent/bubble_shooter_task1.md"

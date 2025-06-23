@@ -7,3 +7,7 @@ tiktoken
 faiss-cpu
 python-dotenv
 pyyaml
+# Local embedding alternatives
+sentence-transformers
+transformers
+torch
