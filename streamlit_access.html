@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoGen Coding Agent - Access Portal</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            max-width: 600px;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        p {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+        .btn {
+            display: inline-block;
+            background: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            transition: background 0.3s;
+            margin: 10px;
+        }
+        .btn:hover {
+            background: #45a049;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 10px;
+            background: rgba(76, 175, 80, 0.2);
+            border-left: 4px solid #4CAF50;
+            border-radius: 4px;
+        }
+        .links {
+            margin-top: 2rem;
+            font-size: 0.9rem;
+        }
+        .links a {
+            color: #FFD700;
+            text-decoration: none;
+            margin: 0 10px;
+        }
+    </style>
+    <script>
+        // Check multiple ports where Streamlit might be running
+        const ports = [8501, 8502, 8503];
+        let workingPort = null;
+        
+        async function checkPorts() {
+            for (let port of ports) {
+                try {
+                    const response = await fetch(`http://localhost:${port}`);
+                    if (response.ok) {
+                        workingPort = port;
+                        document.getElementById('status').innerHTML = `✅ Streamlit is running on port ${port}!`;
+                        
+                        // Update all links to use the working port
+                        document.querySelectorAll('a[href*="localhost"]').forEach(link => {
+                            link.href = `http://localhost:${port}`;
+                        });
+                        
+                        // Auto-redirect after 3 seconds
+                        setTimeout(function() {
+                            window.location.href = `http://localhost:${port}`;
+                        }, 3000);
+                        
+                        return;
+                    }
+                } catch (error) {
+                    console.log(`Port ${port} not accessible:`, error);
+                }
+            }
+            
+            document.getElementById('status').innerHTML = '❌ Cannot connect to Streamlit on any port (8501, 8502, 8503)';
+        }
+        
+        // Check ports when page loads
+        checkPorts();
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 AutoGen Coding Agent</h1>
+        <p>Your AI-powered coding assistant is ready!</p>
+        
+        <div class="status" id="status">
+            🔄 Checking Streamlit status...
+        </div>
+        
+        <p>You will be automatically redirected to the Streamlit UI in 3 seconds, or click the button below:</p>
+        
+        <a href="http://localhost:8502" class="btn">🚀 Open Streamlit UI (Port 8502)</a>
+        <a href="http://localhost:8501" class="btn">🔗 Try Port 8501</a>
+        
+        <div class="links">
+            <p>Alternative access methods:</p>
+            <a href="http://localhost:8502" target="_blank">localhost:8502</a> |
+            <a href="http://localhost:8501" target="_blank">localhost:8501</a> |
+            <a href="http://127.0.0.1:8502" target="_blank">127.0.0.1:8502</a>
+        </div>
+        
+        <div style="margin-top: 2rem; font-size: 0.8rem; opacity: 0.7;">
+            <p>If you see this page but the Streamlit UI doesn't load:</p>
+            <p>1. Make sure Python/Streamlit is running<br>
+            2. Check that port 8501 is not blocked<br>
+            3. Try refreshing the page<br>
+            4. Run: <code>streamlit run streamlit_app.py</code></p>
+        </div>
+    </div>
+</body>
+</html>

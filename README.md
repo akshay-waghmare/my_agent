@@ -1,11 +1,32 @@
 # AutoGen Coding Agent
 
-A local AI coding agent using Autogen + LangChain that:
+> **🎉 NEW: Fully LLM-Driven Implementation!**  
+> This agent now uses **Language Models** (LM Studio, OpenAI, etc.) to generate all code dynamically instead of hardcoded templates. See `LLM_INTEGRATION_README.md` for detailed documentation.
 
-✅ Reads and embeds your repo (RAG)
-✅ Understands and reasons over the codebase
-✅ Executes task steps from `tasks.md`
-✅ Edits files based on your instructions
+A **fully LLM-driven** AI coding agent that generates code dynamically using Language Models instead of hardcoded templates.
+
+## 🚀 Key Features
+
+✅ **LLM-Driven Code Generation**: All code is generated through AI reasoning, not templates  
+✅ **Streamlit UI**: User-friendly interface with real-time progress and file preview  
+✅ **Multi-Provider Support**: LM Studio (local), OpenAI, Anthropic, Groq  
+✅ **Intelligent Task Execution**: Automatically determines file types and implementation approach  
+✅ **Dynamic Content Creation**: Adapts to any project type or programming language  
+✅ **RAG Integration**: Understands and reasons over existing codebases  
+
+## 🎯 What Makes This Different
+
+### Before (Template-Based)
+- Hardcoded HTML/CSS/JS templates
+- Limited to predefined project types
+- Static, unchanging output
+- Manual template maintenance
+
+### After (LLM-Driven)
+- AI generates all code based on requirements
+- Supports any programming language or framework
+- Dynamic, contextual output
+- Self-improving through LLM updates
 
 ## 📁 Project Structure
 

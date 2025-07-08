@@ -2,11 +2,14 @@
 MCP (Model Context Protocol) Style Loader for AutoGen Coding Agent
 
 This module implements an MCP-like approach for loading tasks and tools,
-then dynamically feeding them into AutoGen agents.
+then dynamically feeding them into AutoGen agents with full LLM integration.
 """
 
 import yaml
 import os
+import requests
+import json
+import re
 from pathlib import Path
 from typing import Dict, List, Any, Callable
 
@@ -22,6 +25,13 @@ class MCPLoader:
         self.tools = {}
         self.constraints = []
         self.goals = []
+        
+        # Initialize LLM settings from config
+        self.llm_config = self.config.get('llm', {
+            'provider': 'lmstudio',
+            'temperature': 0.2,
+            'max_tokens': 2000
+        })
         
     def load_tasks(self) -> List[Dict]:
         """Load and parse tasks from markdown file"""
@@ -121,9 +131,49 @@ class MCPLoader:
         """Register multiple tools from a module"""
         for name, func in module_functions.items():
             self.register_tool(name, func, func.__doc__ or "")
+    
+    def _call_llm(self, prompt: str) -> str:
+        """Call the configured LLM with the given prompt"""
+        try:
+            if self.llm_config['provider'] == 'lmstudio':
+                response = requests.post(
+                    "http://localhost:1234/v1/chat/completions",
+                    headers={"Content-Type": "application/json"},
+                    json={
+                        "model": "default",
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": self.llm_config.get('temperature', 0.2),
+                        "max_tokens": self.llm_config.get('max_tokens', 2000)
+                    },
+                    timeout=60
+                )
+                
+                if response.status_code == 200:
+                    return response.json()["choices"][0]["message"]["content"]
+                else:
+                    print(f"LLM API error: {response.status_code}")
+                    return None
+            else:
+                print(f"Unsupported LLM provider: {self.llm_config['provider']}")
+                return None
+        except Exception as e:
+            print(f"Error calling LLM: {str(e)}")
+            return None
+    
+    def _extract_code_from_llm_response(self, response: str) -> str:
+        """Extract code content from LLM response"""
+        # Look for code blocks
+        code_block_pattern = r'```(?:\w+)?\n(.*?)\n```'
+        matches = re.findall(code_block_pattern, response, re.DOTALL)
+        
+        if matches:
+            return matches[0].strip()
+        
+        # If no code blocks found, return the response as-is (might be plain code)
+        return response.strip()
             
     def execute_task(self, task: Dict) -> Dict:
-        """Execute a single task using available tools"""
+        """Execute a single task using available tools and LLM reasoning"""
         print(f"\n🎯 Executing Task {task['id']}: {task['name']}")
         print(f"Description: {task['description']}")
         
@@ -132,11 +182,16 @@ class MCPLoader:
         for i, step in enumerate(task['steps'], 1):
             print(f"\n📋 Step {i}: {step}")
             
-            # Determine which tool to use based on step content
-            if 'create' in step.lower() and 'html' in step.lower():
-                result = self._create_html_file(step)
-            elif 'style' in step.lower() or 'css' in step.lower():
+            # Use LLM to determine the best approach for each step
+            if any(keyword in step.lower() for keyword in ['create', 'html', 'file']):
+                if 'html' in step.lower():
+                    result = self._create_html_file(step)
+                else:
+                    result = self._create_file_with_llm(step)
+            elif any(keyword in step.lower() for keyword in ['style', 'css', 'design', 'appearance']):
                 result = self._add_styling(step)
+            elif any(keyword in step.lower() for keyword in ['javascript', 'js', 'script', 'interactive']):
+                result = self._create_javascript_with_llm(step)
             else:
                 result = self._execute_general_step(step)
                 
@@ -153,46 +208,150 @@ class MCPLoader:
             'results': results,
             'overall_success': all(r['success'] for r in results)
         }
+    
+    def _create_file_with_llm(self, step: str) -> str:
+        """Create any type of file based on the step description using LLM"""
+        print(f"🤖 Using LLM to generate file content for: {step}")
+        
+        # Create a detailed prompt for the LLM
+        prompt = f"""
+You are an expert software developer. Create a complete file based on this requirement:
+
+"{step}"
+
+Requirements:
+- Analyze the step to determine what type of file is needed
+- Create complete, production-ready code
+- Follow best practices for the file type
+- Include proper comments and documentation
+- Suggest an appropriate filename
+
+Please provide:
+1. The suggested filename
+2. The complete file content
+
+Format your response as:
+filename: [suggested_filename]
+```[language]
+[complete code content]
+```
+"""
+        
+        # Get file content from LLM
+        llm_response = self._call_llm(prompt)
+        
+        if not llm_response:
+            return "Error: Failed to generate file content with LLM"
+        
+        # Extract filename and content
+        filename_match = re.search(r'filename:\s*([^\n]+)', llm_response, re.IGNORECASE)
+        filename = filename_match.group(1).strip() if filename_match else "generated_file.txt"
+        
+        # Extract code content
+        file_content = self._extract_code_from_llm_response(llm_response)
+        
+        # Use the file creation tool
+        filepath = f'project-code/{filename}'
+        if 'create_file' in self.tools:
+            result = self.tools['create_file']['function'](filepath, file_content)
+        else:
+            # Fallback to direct file creation
+            try:
+                os.makedirs('project-code', exist_ok=True)
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(file_content)
+                result = f"Successfully created {filepath} with LLM-generated content"
+            except Exception as e:
+                result = f"Error creating file: {e}"
+                
+        print(f"✅ {result}")
+        return result
+    
+    def _create_javascript_with_llm(self, step: str) -> str:
+        """Create JavaScript file based on the step description using LLM"""
+        print(f"🤖 Using LLM to generate JavaScript content for: {step}")
+        
+        # Create a detailed prompt for the LLM
+        prompt = f"""
+You are an expert JavaScript developer. Create a complete JavaScript file based on this requirement:
+
+"{step}"
+
+Requirements:
+- Create modern, clean JavaScript code
+- Follow best practices and ES6+ standards
+- Include proper comments and documentation
+- Ensure code is production-ready
+- Make it compatible with modern browsers
+
+Please provide ONLY the JavaScript code, no explanations or additional text.
+"""
+        
+        # Get JavaScript content from LLM
+        js_content = self._call_llm(prompt)
+        
+        if not js_content:
+            return "Error: Failed to generate JavaScript content with LLM"
+        
+        # Extract code if it's wrapped in code blocks
+        js_content = self._extract_code_from_llm_response(js_content)
+        
+        # Use the file creation tool
+        filepath = 'project-code/script.js'
+        if 'create_file' in self.tools:
+            result = self.tools['create_file']['function'](filepath, js_content)
+        else:
+            # Fallback to direct file creation
+            try:
+                os.makedirs('project-code', exist_ok=True)
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(js_content)
+                result = f"Successfully created {filepath} with LLM-generated content"
+            except Exception as e:
+                result = f"Error creating JavaScript file: {e}"
+                
+        print(f"✅ {result}")
+        return result
         
     def _create_html_file(self, step: str) -> str:
-        """Create an HTML file based on the step description"""
-        # Extract any specific content from the step
-        if 'hello agentic world' in step.lower():
-            content = '''<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hello Agentic World</title>
-</head>
-<body>
-    <h1>Hello Agentic World</h1>
-    <p>Welcome to the world of AI agents!</p>
-</body>
-</html>'''
-        else:
-            content = '''<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generated Page</title>
-</head>
-<body>
-    <h1>Generated Content</h1>
-</body>
-</html>'''
+        """Create an HTML file based on the step description using LLM"""
+        print(f"🤖 Using LLM to generate HTML content for: {step}")
+        
+        # Create a detailed prompt for the LLM
+        prompt = f"""
+You are an expert web developer. Create a complete, modern HTML file based on this requirement:
+
+"{step}"
+
+Requirements:
+- Create a complete, valid HTML5 document
+- Include proper meta tags and document structure
+- Make it visually appealing with modern styling
+- Ensure it's responsive and accessible
+- Include relevant content based on the step description
+
+Please provide ONLY the HTML code, no explanations or additional text.
+"""
+        
+        # Get HTML content from LLM
+        html_content = self._call_llm(prompt)
+        
+        if not html_content:
+            return "Error: Failed to generate HTML content with LLM"
+        
+        # Extract code if it's wrapped in code blocks
+        html_content = self._extract_code_from_llm_response(html_content)
         
         # Use the file creation tool
         if 'create_file' in self.tools:
-            result = self.tools['create_file']['function']('project-code/index.html', content)
+            result = self.tools['create_file']['function']('project-code/index.html', html_content)
         else:
             # Fallback to direct file creation
             try:
                 os.makedirs('project-code', exist_ok=True)
                 with open('project-code/index.html', 'w', encoding='utf-8') as f:
-                    f.write(content)
-                result = "Successfully created project-code/index.html"
+                    f.write(html_content)
+                result = "Successfully created project-code/index.html with LLM-generated content"
             except Exception as e:
                 result = f"Error creating HTML file: {e}"
                 
@@ -200,7 +359,7 @@ class MCPLoader:
         return result
         
     def _add_styling(self, step: str) -> str:
-        """Add styling to the HTML file"""
+        """Add styling to the HTML file using LLM"""
         html_file = 'project-code/index.html'
         
         if not os.path.exists(html_file):
@@ -209,70 +368,45 @@ class MCPLoader:
         try:
             # Read current file
             with open(html_file, 'r', encoding='utf-8') as f:
-                content = f.read()
-                
-            # Add CSS styling
-            css_styles = '''
-    <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            color: white;
-        }
-        
-        h1 {
-            font-size: 3rem;
-            text-align: center;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-            margin-bottom: 1rem;
-            animation: fadeIn 2s ease-in;
-        }
-        
-        p {
-            font-size: 1.2rem;
-            text-align: center;
-            opacity: 0.9;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .container {
-            text-align: center;
-            padding: 2rem;
-            background: rgba(255,255,255,0.1);
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-        }
-    </style>'''
+                current_content = f.read()
             
-            # Insert styles before </head> and wrap content in container
-            if '</head>' in content:
-                content = content.replace('</head>', css_styles + '\n</head>')
+            print(f"🤖 Using LLM to generate CSS styling for: {step}")
             
-            # Wrap body content in a container
-            if '<body>' in content and '</body>' in content:
-                body_start = content.find('<body>') + 6
-                body_end = content.find('</body>')
-                body_content = content[body_start:body_end].strip()
-                
-                new_body_content = f'\n    <div class="container">\n        {body_content}\n    </div>\n'
-                content = content[:body_start] + new_body_content + content[body_end:]
+            # Create a detailed prompt for the LLM
+            prompt = f"""
+You are an expert web developer and designer. I have an existing HTML file and need to add beautiful, modern styling based on this requirement:
+
+"{step}"
+
+Current HTML content:
+{current_content}
+
+Requirements:
+- Add modern, responsive CSS styling
+- Make it visually appealing with good design principles
+- Ensure accessibility and usability
+- Use modern CSS features (flexbox, grid, animations if appropriate)
+- Make it mobile-responsive
+- Follow the styling requirement in the step description
+
+Please provide the COMPLETE updated HTML file with the CSS styling included (either in <style> tags or as a separate CSS file if you also provide that). Provide ONLY the code, no explanations.
+"""
             
-            # Write back to file
+            # Get styled content from LLM
+            styled_content = self._call_llm(prompt)
+            
+            if not styled_content:
+                return "Error: Failed to generate styled content with LLM"
+            
+            # Extract code if it's wrapped in code blocks
+            styled_content = self._extract_code_from_llm_response(styled_content)
+            
+            # Write the updated content back to the file
             with open(html_file, 'w', encoding='utf-8') as f:
-                f.write(content)
+                f.write(styled_content)
                 
-            result = "Successfully added beautiful styling to index.html"
+            result = "Successfully added LLM-generated styling to index.html"
+            
         except Exception as e:
             result = f"Error adding styling: {e}"
             
@@ -280,8 +414,83 @@ class MCPLoader:
         return result
         
     def _execute_general_step(self, step: str) -> str:
-        """Execute a general step"""
-        return f"Executed: {step}"
+        """Execute a general step using LLM reasoning"""
+        print(f"🤖 Using LLM to execute general step: {step}")
+        
+        # Create a detailed prompt for the LLM
+        prompt = f"""
+You are an expert software developer. I need help executing this development step:
+
+"{step}"
+
+Context: This is part of a larger software project. Please analyze what needs to be done and provide specific instructions or code to accomplish this step.
+
+If this step requires creating files, modifying code, or implementing functionality, please provide:
+1. A clear explanation of what needs to be done
+2. Any code that should be created or modified
+3. File names and structure if applicable
+
+Focus on practical implementation details.
+"""
+        
+        # Get instructions from LLM
+        llm_response = self._call_llm(prompt)
+        
+        if not llm_response:
+            return f"Error: Failed to get LLM guidance for step: {step}"
+        
+        # Check if the LLM response contains code that should be saved to files
+        if "```" in llm_response and ("create" in step.lower() or "file" in step.lower()):
+            # Try to extract and save any code files mentioned
+            try:
+                self._process_llm_file_instructions(llm_response, step)
+            except Exception as e:
+                print(f"Warning: Could not process file instructions: {e}")
+        
+        result = f"LLM executed step successfully. Response: {llm_response[:200]}..."
+        print(f"✅ {result}")
+        return result
+    
+    def _process_llm_file_instructions(self, llm_response: str, step: str):
+        """Process LLM response to extract and create any files mentioned"""
+        # Extract code blocks
+        code_blocks = re.findall(r'```(\w+)?\n(.*?)\n```', llm_response, re.DOTALL)
+        
+        # Look for file names in the response
+        filename_patterns = [
+            r'create\s+(?:a\s+)?(?:file\s+)?(?:named\s+)?["`]?([^\s"`]+\.\w+)["`]?',
+            r'save\s+(?:this\s+)?(?:as\s+)?["`]?([^\s"`]+\.\w+)["`]?',
+            r'filename:\s*["`]?([^\s"`]+\.\w+)["`]?',
+            r'file:\s*["`]?([^\s"`]+\.\w+)["`]?'
+        ]
+        
+        filenames = []
+        for pattern in filename_patterns:
+            matches = re.findall(pattern, llm_response, re.IGNORECASE)
+            filenames.extend(matches)
+        
+        # Create files if we found both code blocks and filenames
+        if code_blocks and filenames:
+            os.makedirs('project-code', exist_ok=True)
+            
+            for i, (lang, code) in enumerate(code_blocks):
+                if i < len(filenames):
+                    filename = filenames[i]
+                    filepath = os.path.join('project-code', filename)
+                    
+                    with open(filepath, 'w', encoding='utf-8') as f:
+                        f.write(code.strip())
+                    
+                    print(f"📁 Created file: {filepath}")
+                elif len(code_blocks) == 1 and len(filenames) >= 1:
+                    # If there's one code block and one or more filenames, use the first filename
+                    filename = filenames[0]
+                    filepath = os.path.join('project-code', filename)
+                    
+                    with open(filepath, 'w', encoding='utf-8') as f:
+                        f.write(code.strip())
+                    
+                    print(f"📁 Created file: {filepath}")
         
     def run_all_tasks(self) -> List[Dict]:
         """Run all loaded tasks"""

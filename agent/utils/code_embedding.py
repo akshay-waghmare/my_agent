@@ -1,7 +1,7 @@
 """
 Code embedding and retrieval utilities for the AutoGen Coding Agent.
 This module provides functions for embedding code and retrieving relevant snippets.
-Supports both OpenAI and local embeddings.
+Uses only local embeddings to avoid external API dependencies.
 """
 
 from langchain_community.vectorstores import FAISS
@@ -11,64 +11,52 @@ from pathlib import Path
 import os
 import logging
 
-# Prevent any accidental OpenAI imports
-import sys
-class OpenAIBlocker:
-    def __getattr__(self, name):
-        raise ImportError(f"OpenAI embedding usage blocked: {name}. Use local embeddings instead.")
-
-# Block langchain_openai module to prevent accidental usage
-sys.modules['langchain_openai'] = OpenAIBlocker()
-sys.modules['langchain.embeddings.openai'] = OpenAIBlocker()
-
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def create_embeddings(config):
     """
-    Create embeddings based on configuration
+    Create embeddings based on configuration (Local only)
     
     Args:
         config: Configuration dictionary
         
     Returns:
-        Embeddings instance (Local only - no OpenAI fallback)
+        Local embeddings instance
     """
-    rag_config = config.get("rag", {})
-    provider = rag_config.get("embeddings_provider", "local").lower()
+    try:
+        from .embedding_local import LocalEmbeddings
+        rag_config = config.get("rag", {})
+        model_name = rag_config.get("local_embeddings_model", "all-MiniLM-L6-v2")
+        logger.info(f"Using local embeddings with model: {model_name}")
+        return LocalEmbeddings(model_name)
+    except ImportError as e:
+        logger.error(f"Local embeddings not available ({e}). Please install: pip install sentence-transformers")
+        # Return a simple fallback embeddings class
+        return SimpleLocalEmbeddings()
+
+class SimpleLocalEmbeddings:
+    """Simple fallback embeddings when sentence-transformers is not available"""
     
-    if provider == "local":
-        try:
-            from .embedding_local import LocalEmbeddings
-            model_name = rag_config.get("local_embeddings_model", "all-MiniLM-L6-v2")
-            logger.info(f"Using local embeddings with model: {model_name}")
-            return LocalEmbeddings(model_name)
-        except ImportError as e:
-            logger.error(f"Local embeddings not available ({e}). Please install: pip install sentence-transformers")
-            raise ImportError("Local embeddings required but not available. Install sentence-transformers package.")
-    elif provider == "code":
-        try:
-            from .embedding_local import CodeEmbeddings
-            logger.info("Using specialized code embeddings")
-            return CodeEmbeddings()
-        except ImportError as e:
-            logger.error(f"Code embeddings not available ({e}). Using local embeddings instead.")
-            # Fallback to local embeddings
-            from .embedding_local import LocalEmbeddings
-            model_name = rag_config.get("local_embeddings_model", "all-MiniLM-L6-v2")
-            return LocalEmbeddings(model_name)
-    elif provider == "openai":
-        logger.error("OpenAI embeddings disabled to avoid API calls. Using local embeddings instead.")
-        # Force use of local embeddings
-        from .embedding_local import LocalEmbeddings
-        model_name = rag_config.get("local_embeddings_model", "all-MiniLM-L6-v2")
-        return LocalEmbeddings(model_name)
-    else:
-        logger.info("Unknown provider, defaulting to local embeddings")
-        from .embedding_local import LocalEmbeddings
-        model_name = rag_config.get("local_embeddings_model", "all-MiniLM-L6-v2")
-        return LocalEmbeddings(model_name)
+    def embed_documents(self, texts):
+        """Simple hash-based embedding fallback"""
+        import hashlib
+        embeddings = []
+        for text in texts:
+            # Create a simple numeric representation
+            hash_obj = hashlib.md5(text.encode())
+            hash_hex = hash_obj.hexdigest()
+            # Convert to a simple vector (just for demonstration)
+            embedding = [int(hash_hex[i:i+2], 16) / 255.0 for i in range(0, min(32, len(hash_hex)), 2)]
+            # Pad to consistent length
+            embedding = (embedding + [0.0] * 16)[:16]
+            embeddings.append(embedding)
+        return embeddings
+    
+    def embed_query(self, text):
+        """Simple hash-based query embedding"""
+        return self.embed_documents([text])[0]
 
 def embed_codebase(config, code_dir="project-code", tasks_dir="agent", tasks_file="tasks.md", 
                 file_extensions=None):

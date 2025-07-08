@@ -1,8 +1,8 @@
 # Agent configuration
 
 llm:  # Provider can be: openai, groq, anthropic, azure, huggingface, vllm, lmstudio
-  provider: "groq"  # Set your default provider here
-  model: "llama3-70b-8192"      # Default model to use with selected provider
+  provider: "lmstudio"  # Set your default provider here
+  model: "phi-2"      # Default model to use with selected provider
   
   # Common parameters
   temperature: 0.2
